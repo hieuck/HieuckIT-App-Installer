@@ -100,3 +100,85 @@ applications:
       - Name: Pro
         Url_x64: https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/patches/AirClusterProCr4ck.rar
         Url_x86: https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/patches/AirClusterProCr4ck.rar
+
+  - Name: AirLiveDrive
+    ProcessName: AirLiveDrive.exe
+    RegistryDisplayName: AirLiveDrive
+    InstallerArgs: /S
+    DownloadLinks:
+      - Name: AirLiveDrive
+        Url_x64: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/AirLiveDrive-Installer.exe
+        Url_x86: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/AirLiveDrive-Installer.exe
+    PatchArgs: 'x -p123 "{patch_path}" -o"{install_dir}" -aoa -y'
+    PatchLinks:
+      - Name: Pro
+        Url_x64: https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/patches/AirLiveDriveProCr4ck.rar
+        Url_x86: https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/patches/AirLiveDriveProCr4ck.rar
+
+  - Name: AnyDesk
+    ProcessName: AnyDesk.exe
+    RegistryDisplayName: AnyDesk
+    InstallerArgs: --install "{install_dir}" --start-with-win --create-shortcuts --create-desktop-icon --update-disabled --silent
+    DownloadLinks:
+      - Name: AnyDesk
+        Url_x64: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/AnyDesk.6.1.0.exe
+        Url_x86: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/AnyDesk.6.1.0.exe
+
+  - Name: AquaSnap
+    ProcessName: AquaSnap.Daemon.exe
+    RegistryDisplayName: AquaSnap
+    InstallerArgs: /quiet /norestart
+    DownloadLinks:
+      - Name: AquaSnap
+        Url_x64: https://www.nurgo-software.com/download/AquaSnap.msi
+        Url_x86: https://www.nurgo-software.com/download/AquaSnap.msi
+    PatchArgs: 'x -p123 "{patch_path}" -o"{install_dir}" -aoa -y winspool.drv'
+    PatchLinks:
+      - Name: Pro
+        Url_x64: https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/patches/AquaSnapCr4ck.rar
+        Url_x86: https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/patches/AquaSnapCr4ck.rar
+
+  - Name: CrystalDiskInfo
+    ProcessName: DiskInfo64.exe
+    RegistryDisplayName: CrystalDiskInfo
+    InstallerArgs: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    DownloadLinks:
+      - Name: CrystalDiskInfo
+        Url_x64: https://crystalmark.info/download/zz/CrystalDiskInfo9_1_1.exe
+        Url_x86: https://crystalmark.info/download/zz/CrystalDiskInfo9_1_1.exe
+
+  - Name: CrystalDiskMark
+    ProcessName: DiskMark64.exe
+    RegistryDisplayName: CrystalDiskMark
+    InstallerArgs: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    DownloadLinks:
+      - Name: CrystalDiskMark
+        Url_x64: https://crystalmark.info/download/zz/CrystalDiskMark8_0_4c.exe
+        Url_x86: https://crystalmark.info/download/zz/CrystalDiskMark8_0_4c.exe
+
+  - Name: Discord
+    ProcessName: Update.exe
+    RegistryDisplayName: Discord
+    InstallerArgs: /S
+    DownloadLinks:
+      - Name: Discord
+        Url_x64: https://discord.com/api/downloads/distributions/app/installers/latest?channel=stable&platform=win&arch=x86
+        Url_x86: https://discord.com/api/downloads/distributions/app/installers/latest?channel=stable&platform=win&arch=x86
+
+  - Name: Dropbox
+    ProcessName: Dropbox.exe
+    RegistryDisplayName: Dropbox
+    InstallerArgs: /S
+    DownloadLinks:
+      - Name: Dropbox
+        Url_x64: https://www.dropbox.com/download?os=win
+        Url_x86: https://www.dropbox.com/download?os=win
+
+  - Name: Everything
+    ProcessName: Everything.exe
+    RegistryDisplayName: Everything
+    InstallerArgs: /S
+    DownloadLinks:
+      - Name: Everything 64-bit
+        Url_x64: https://www.voidtools.com/Everything-1.4.1.1024.x64-Setup.exe
+        Url_x86: https://www.voidtools.com/Everything-1.4.1.1024.x86-Setup.exe
