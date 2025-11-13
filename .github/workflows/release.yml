@@ -1,13 +1,15 @@
-
 name: .NET Core Desktop
 
 on:
   push:
     branches: [ "main" ]
 
+permissions: # Add this block
+  contents: write # Grant write permissions to create releases
+
 jobs:
   build:
-    runs-on: windows-latest  # Using a Windows runner for a Windows app
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
@@ -28,11 +30,12 @@ jobs:
       id: version
       shell: pwsh
       run: |
-        $version = [xml](Get-Content .\HieuckIT-App-Installer.csproj)
+        $projectFile = Get-ChildItem -Filter *.csproj | Select-Object -First 1
+        $version = [xml](Get-Content $projectFile.FullName)
         $version = $version.Project.PropertyGroup.Version
         echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-    - name: 'Create Release'
+    - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
@@ -45,6 +48,12 @@ jobs:
         draft: false
         prerelease: false
 
+    - name: 'Package Release Assets'
+      shell: pwsh
+      run: |
+        $publishDir = ".\\bin\\Release\\net8.0-windows\\win-x64\\publish"
+        Compress-Archive -Path "$publishDir\\*" -DestinationPath "HieuckIT-App-Installer-v${{ steps.version.outputs.version }}.zip"
+
     - name: 'Upload Release Asset'
       id: upload-release-asset 
       uses: actions/upload-release-asset@v1
@@ -52,6 +61,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: .\bin\Release\net8.0-windows\win-x64\publish\HieuckIT-App-Installer.exe
-        asset_name: HieuckIT-App-Installer.exe
-        asset_content_type: application/vnd.microsoft.portable-executable
+        asset_path: .\HieuckIT-App-Installer-v${{ steps.version.outputs.version }}.zip
+        asset_name: HieuckIT-App-Installer-v${{ steps.version.outputs.version }}.zip
+        asset_content_type: application/zip
