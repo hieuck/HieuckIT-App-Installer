@@ -36,8 +36,11 @@ applications:
       - Name: Notepad++ 64-bit
         Url_x64: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.6/npp.8.6.Installer.x64.exe
         Url_x86: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.6/npp.8.6.Installer.exe
-    PatchLinks: []
-    PatchArgs: ""
+    PatchLinks:
+      - Name: NppPlugins
+        Url_x64: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Cr4ck/NppPlugins.rar
+        Url_x86: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Cr4ck/NppPlugins32.rar
+    PatchArgs: "-p123"
 
   - Name: VLC Media Player
     RegistryDisplayName: VLC media player
