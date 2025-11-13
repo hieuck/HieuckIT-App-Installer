@@ -1,0 +1,57 @@
+
+name: .NET Core Desktop
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest  # Using a Windows runner for a Windows app
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet publish -c Release --self-contained true -r win-x64
+
+    - name: 'Get Project Version'
+      id: version
+      shell: pwsh
+      run: |
+        $version = [xml](Get-Content .\HieuckIT-App-Installer.csproj)
+        $version = $version.Project.PropertyGroup.Version
+        echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+    - name: 'Create Release'
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        release_name: Release v${{ steps.version.outputs.version }}
+        body: |
+          Automated release for version ${{ steps.version.outputs.version }}.
+        draft: false
+        prerelease: false
+
+    - name: 'Upload Release Asset'
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: .\bin\Release\net8.0-windows\win-x64\publish\HieuckIT-App-Installer.exe
+        asset_name: HieuckIT-App-Installer.exe
+        asset_content_type: application/vnd.microsoft.portable-executable
