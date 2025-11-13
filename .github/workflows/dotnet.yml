@@ -1,34 +1,38 @@
-# .github/workflows/dotnet.yml
 
 name: .NET Build & Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   build:
-    runs-on: windows-latest  # Use a Windows runner for a Windows Forms app
+    runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '6.0.x' # Use .NET 6
+        dotnet-version: '8.x'
 
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Build
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build --no-restore
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+
+    - name: Publish
+      run: dotnet publish -c Release --output ./publish
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: HieuckIT-App-Installer-Release
-        path: bin/Release/net6.0-windows/
+        name: HieuckIT-App-Installer
+        path: ./publish
