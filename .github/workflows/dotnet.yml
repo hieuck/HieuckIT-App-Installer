@@ -21,15 +21,19 @@ jobs:
 
     - name: Restore dependencies
       run: dotnet restore
+      working-directory: scripts
 
     - name: Build
       run: dotnet build --no-restore
+      working-directory: scripts
 
     - name: Test
       run: dotnet test --no-build --verbosity normal
+      working-directory: scripts
 
     - name: Publish
-      run: dotnet publish -c Release --output ./publish
+      run: dotnet publish -c Release --output ../publish
+      working-directory: scripts
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
