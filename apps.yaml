@@ -1,4 +1,342 @@
-# Default configuration file.
-# This will be replaced by the downloaded version if available.
-applications: []
-utilities: []
+# ===============================================================
+# YAML Configuration for HieuckIT App Installer
+# ===============================================================
+# This file defines all applications and utilities available for installation.
+#
+# Placeholders:
+#   {version}: Will be replaced by the 'Version' field of the application.
+#   {install_dir}: The final installation directory of the application.
+#   {temp_dir}: A temporary directory for downloading and extracting files.
+# ===============================================================
+
+# ===============================================================
+# A. APPLICATIONS - Software to be installed
+# ===============================================================
+applications:
+  - Name: 7-Zip
+    ProcessName: 7zFM.exe
+    RegistryDisplayName: 7-Zip
+    DownloadLinks:
+      - Name: Official
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://www.7-zip.org/a/7z2301-x64.exe
+            Url_x86: https://www.7-zip.org/a/7z2301.exe
+    InstallSteps:
+      - Type: DownloadAndRun
+        Args: /S
+    PostInstall:
+      - Type: CreateShortcut
+        Target: '{install_dir}\7zFM.exe'
+        ShortcutName: 7-Zip File Manager
+
+  - Name: Google Chrome
+    ProcessName: chrome.exe
+    RegistryDisplayName: Google Chrome
+    DownloadLinks:
+      - Name: Official
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://dl.google.com/chrome/install/latest/chrome_installer.exe
+            Url_x86: https://dl.google.com/chrome/install/latest/chrome_installer.exe
+          - OSVersion: Win7
+            Url_x64: https://github.com/hieuck/HieuckIT-App-Installer/raw/main/installers/Chrome/ChromeSetupOld64.exe
+            Url_x86: https://github.com/hieuck/HieuckIT-App-Installer/raw/main/installers/Chrome/ChromeSetupOld32.exe
+    InstallSteps:
+      - Type: DownloadAndRun
+        Args: ''
+    PostInstall:
+      - Type: RunCommand
+        Command: 'powershell -Command "Start-Process ''{install_dir}\chrome.exe'' -ArgumentList ''--make-default-browser''"'
+        RequiresAdmin: true
+      - Type: CreateShortcut
+        Target: '{install_dir}\chrome.exe'
+        ShortcutName: 'Google Chrome'
+      - Type: OpenFile
+        Path: '{install_dir}\chrome.exe'
+
+  - Name: AIDA64 Extreme
+    ProcessName: aida64.exe
+    RegistryDisplayName: AIDA64 Extreme
+    Version: '690'
+    DownloadLinks:
+      - Name: Official
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://download.aida64.com/aida64extreme{version}.exe
+            Url_x86: https://download.aida64.com/aida64extreme{version}.exe
+    InstallSteps:
+      - Type: DownloadAndRun
+        Args: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    Patch:
+      - Type: Download
+        Url: https://github.com/hieuck/HieuckIT-App-Installer/raw/main/patches/AIDA64ExtremeCr4ck.rar
+        FileName: AIDA64Cr4ck.rar
+        RequiresAdmin: true
+      - Type: Extract
+        Archive: '{temp_dir}\AIDA64Cr4ck.rar'
+        Destination: '{install_dir}'
+        Args: 'x -p123 -aoa -y'
+        RequiresAdmin: true
+      - Type: OpenFile
+        Path: '{install_dir}\Key_AIDA64.txt'
+      - Type: OpenFile
+        Path: '{install_dir}\aida64.exe'
+        Args: /silent
+
+  - Name: Core Temp
+    ProcessName: "Core Temp.exe"
+    RegistryDisplayName: Core Temp
+    DownloadLinks:
+      - Name: Official
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://www.alcpu.com/CoreTemp/CoreTemp64.zip
+            Url_x86: https://www.alcpu.com/CoreTemp/CoreTemp32.zip
+    InstallSteps:
+      - Type: Download
+        FileName: CoreTemp.zip
+      - Type: Extract
+        Archive: '{temp_dir}\CoreTemp.zip'
+        Destination: '%ProgramFiles%\Core Temp'
+        Args: 'x -aoa -y'
+        RequiresAdmin: true
+    PostInstall:
+      - Type: CreateShortcut
+        Target: '%ProgramFiles%\Core Temp\Core Temp.exe'
+        ShortcutName: Core Temp
+
+  - Name: Notepad++
+    ProcessName: notepad++.exe
+    RegistryDisplayName: Notepad++
+    Version: '8.7.1'
+    DownloadLinks:
+      - Name: Official
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v{version}/npp.{version}.Installer.x64.exe
+            Url_x86: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v{version}/npp.{version}.Installer.exe
+    InstallSteps:
+      - Type: DownloadAndRun
+        Args: /S
+    Patch:
+      - Type: Download
+        Url: https://github.com/hieuck/HieuckIT-App-Installer/raw/main/patches/NppPlugins.rar
+        FileName: NppPlugins.rar
+      - Type: Extract
+        Archive: '{temp_dir}\NppPlugins.rar'
+        Destination: '{install_dir}'
+        Args: 'x -p123 -aoa -y'
+    PostInstall:
+      - Type: CreateShortcut
+        Target: '{install_dir}\notepad++.exe'
+        ShortcutName: Notepad++
+
+  - Name: Internet Download Manager
+    ProcessName: IDMan.exe
+    RegistryDisplayName: Internet Download Manager
+    DownloadLinks:
+      - Name: Official
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://www.internetdownloadmanager.com/download.html
+            Url_x86: https://www.internetdownloadmanager.com/download.html
+    InstallSteps:
+      - Type: DownloadAndRun
+        Args: /s
+    Patch:
+      - Type: RunScript
+        Path: "scripts/IDM_Reset_Trial.bat"
+        RequiresAdmin: true
+    PostInstall:
+      - Type: CreateShortcut
+        Target: '{install_dir}\IDMan.exe'
+        ShortcutName: Internet Download Manager
+        
+  - Name: TreeSize Professional 9
+    ProcessName: TreeSize.exe
+    RegistryDisplayName: TreeSize Professional
+    Version: 9.1.5.1885
+    DownloadLinks:
+      - Name: HieuckIT Repo (v9.1.5.1885)
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/TreeSize/TreeSize-9.1.5.1885-Setup.exe
+            Url_x86: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/TreeSize/TreeSize-9.1.5.1885-Setup.exe
+      - Name: Official Website (Latest)
+        Targets:
+          - OSVersion: Default
+            Url_x64: https://downloads.jam-software.de/treesize/TreeSize-Setup.exe
+            Url_x86: https://downloads.jam-software.de/treesize/TreeSize-Setup.exe
+    InstallSteps:
+      - Type: DownloadAndRun
+        Args: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+        RequiresAdmin: true
+    Patch:
+      - Type: Download
+        Url: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Cr4ck/TreeSize9.1.5.1885/TreeSize-9.1.5.1885-Cr4ck.rar
+        FileName: TreeSizeCr4ck.rar
+        RequiresAdmin: true
+      - Type: Extract
+        Archive: '{temp_dir}\TreeSizeCr4ck.rar'
+        Destination: '{install_dir}'
+        Args: 'x -p123 -aoa -y'
+        RequiresAdmin: true
+    PostInstall:
+      - Type: CreateShortcut
+        Target: '{install_dir}\TreeSize.exe'
+        ShortcutName: TreeSize Professional
+        
+# ===============================================================
+# B. MICROSOFT OFFICE SUITE
+# ===============================================================
+  - Name: Microsoft Office 2021 Pro Plus (LTSC, x64)
+    ProcessName: WINWORD.EXE
+    RegistryDisplayName: Microsoft Office LTSC Professional Plus 2021
+    InstallSteps:
+      - Type: Download
+        Url: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/Office/setup/MicrosoftOfficeSetupWindows10.exe
+        FileName: OfficeSetup.exe
+      - Type: Download
+        Url: https://raw.githubusercontent.com/hieuck/curl-uri-wget-download-setup/main/Setup/Office/config/Configuration-2021-64.xml
+        FileName: Configuration.xml
+      - Type: RunCommand
+        Command: '"{temp_dir}\OfficeSetup.exe" /configure "{temp_dir}\Configuration.xml"'
+        RequiresAdmin: true
+    Patch:
+      - Type: Download
+        Url: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Cr4ck/MicrosoftCr4ck/MicrosoftCr4ck.rar
+        FileName: MSCr4ck.rar
+        RequiresAdmin: true
+      - Type: Extract
+        Archive: '{temp_dir}\MSCr4ck.rar'
+        Destination: 'C:\Z_Hieuck.IT_Z'
+        Args: 'x -p123 -aoa -y'
+        RequiresAdmin: true
+      - Type: RunScript
+        Path: 'C:\Z_Hieuck.IT_Z\MAS_AIO.cmd'
+        Args: /HWID /Ohook /S
+        RequiresAdmin: true
+    PostInstall:
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\Word.lnk\" \"%Public%\Desktop\""'
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\Excel.lnk\" \"%Public%\Desktop\""'
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk\" \"%Public%\Desktop\""'
+
+  - Name: Microsoft Office 2021 Pro Plus (LTSC, x86)
+    ProcessName: WINWORD.EXE
+    RegistryDisplayName: Microsoft Office LTSC Professional Plus 2021
+    InstallSteps:
+      - Type: Download
+        Url: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/Office/setup/MicrosoftOfficeSetupWindows10.exe
+        FileName: OfficeSetup.exe
+      - Type: Download
+        Url: https://raw.githubusercontent.com/hieuck/curl-uri-wget-download-setup/main/Setup/Office/config/Configuration-2021-32.xml
+        FileName: Configuration.xml
+      - Type: RunCommand
+        Command: '"{temp_dir}\OfficeSetup.exe" /configure "{temp_dir}\Configuration.xml"'
+        RequiresAdmin: true
+    Patch:
+      - Type: Download
+        Url: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Cr4ck/MicrosoftCr4ck/MicrosoftCr4ck.rar
+        FileName: MSCr4ck.rar
+        RequiresAdmin: true
+      - Type: Extract
+        Archive: '{temp_dir}\MSCr4ck.rar'
+        Destination: 'C:\Z_Hieuck.IT_Z'
+        Args: 'x -p123 -aoa -y'
+        RequiresAdmin: true
+      - Type: RunScript
+        Path: 'C:\Z_Hieuck.IT_Z\MAS_AIO.cmd'
+        Args: /HWID /Ohook /S
+        RequiresAdmin: true
+    PostInstall:
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\Word.lnk\" \"%Public%\Desktop\""'
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\Excel.lnk\" \"%Public%\Desktop\""'
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk\" \"%Public%\Desktop\""'
+        
+  - Name: Microsoft Office 2024 Pro Plus (Preview, x64)
+    ProcessName: WINWORD.EXE
+    RegistryDisplayName: Microsoft Office LTSC Professional Plus 2024
+    InstallSteps:
+      - Type: Download
+        Url: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Setup/Office/setup/MicrosoftOfficeSetupWindows11.exe
+        FileName: OfficeSetup.exe
+      - Type: Download
+        Url: https://raw.githubusercontent.com/hieuck/curl-uri-wget-download-setup/main/Setup/Office/config/Configuration-2024-64.xml
+        FileName: Configuration.xml
+      - Type: RunCommand
+        Command: '"{temp_dir}\OfficeSetup.exe" /configure "{temp_dir}\Configuration.xml"'
+        RequiresAdmin: true
+    Patch:
+      - Type: Download
+        Url: https://github.com/hieuck/curl-uri-wget-download-setup/raw/main/Cr4ck/MicrosoftCr4ck/MicrosoftCr4ck.rar
+        FileName: MSCr4ck.rar
+        RequiresAdmin: true
+      - Type: Extract
+        Archive: '{temp_dir}\MSCr4ck.rar'
+        Destination: 'C:\Z_Hieuck.IT_Z'
+        Args: 'x -p123 -aoa -y'
+        RequiresAdmin: true
+      - Type: RunScript
+        Path: 'C:\Z_Hieuck.IT_Z\MAS_AIO.cmd'
+        Args: /HWID /Ohook /S
+        RequiresAdmin: true
+    PostInstall:
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\Word.lnk\" \"%Public%\Desktop\""'
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\Excel.lnk\" \"%Public%\Desktop\""'
+      - Type: RunCommand
+        Command: 'cmd /c "copy /y \"%ProgramData%\Microsoft\Windows\Start Menu\Programs\PowerPoint.lnk\" \"%Public%\Desktop\""'
+
+# ===============================================================
+# C. UTILITIES - Standalone tools and scripts
+# ===============================================================
+utilities:
+  - Name: Chrome User Data Mover
+    Description: Moves Chrome''s user data folder to a different drive to save space on the system drive.
+    Actions:
+      - Type: RunScript
+        Path: scripts/Chrome_Move_UserData.bat
+        RequiresAdmin: true
+
+  - Name: Zalo Full Disk Fix
+    Description: Moves Zalo''s cache to a different drive to fix the "full disk" issue.
+    Actions:
+      - Type: RunScript
+        Path: scripts/Zalo_Fix_Full_Disk.bat
+        RequiresAdmin: true
+        
+  - Name: Microsoft Office Remover
+    Description: Completely uninstalls Microsoft Office from the system.
+    Actions:
+      - Type: RunScript
+        Path: scripts/MicrosoftOfficeRemove.bat
+        RequiresAdmin: true
+
+  - Name: Edit Hosts File (General)
+    Description: Blocks various telemetry and activation servers for multiple applications like Adobe, Corel, Camtasia.
+    Actions:
+      - Type: RunScript
+        Path: scripts/edithosts.bat
+        RequiresAdmin: true
+        
+  - Name: Crack Windows 7
+    Description: Attempts to activate Windows 7. Use with caution.
+    Actions:
+      - Type: RunScript
+        Path: scripts/Cr4ckWindows7.bat
+        RequiresAdmin: true
+
+  - Name: Reset IDM Trial
+    Description: Runs a script to reset the trial period for Internet Download Manager.
+    Actions:
+      - Type: RunScript
+        Path: scripts/IDM_Reset_Trial.bat
+        RequiresAdmin: true
