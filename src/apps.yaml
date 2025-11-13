@@ -49,5 +49,15 @@ applications:
       - Name: VLC 64-bit
         Url_x64: https://mirror.example.com/videolan/vlc/3.0.20/win64/vlc-3.0.20-win64.msi
         Url_x86: https://mirror.example.com/videolan/vlc/3.0.20/win32/vlc-3.0.20-win32.msi
+
+      - Name: Core Temp
+        RegistryDisplayName: Core Temp
+        InstallerArgs: ""
+        DownloadLinks:
+          - Name: Core Temp 64-bit
+            Url_x64: https://www.alcpu.com/CoreTemp/CoreTemp64.zip
+            Url_x86: https://www.alcpu.com/CoreTemp/CoreTemp32.zip
+        PatchLinks: []
+        PatchArgs: ""
     PatchLinks: []
     PatchArgs: ""
