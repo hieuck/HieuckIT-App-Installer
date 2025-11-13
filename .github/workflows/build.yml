@@ -16,7 +16,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x' # Corrected from 6.0.x
+        dotnet-version: '8.0.x'
 
     - name: Clean project
       run: dotnet clean
@@ -27,12 +27,8 @@ jobs:
     - name: Build and Publish
       run: dotnet publish "HieuckIT-App-Installer.csproj" --configuration Release --self-contained true --runtime win-x64
 
-    - name: Package Application for Testing
-      run: Compress-Archive -Path "bin/Release/net8.0-windows/win-x64/publish/*" -DestinationPath "HieuckIT-App-Installer-Build.zip" # Corrected path
-      shell: pwsh
-
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: HieuckIT-App-Installer-Build
-        path: ./HieuckIT-App-Installer-Build.zip
+        path: bin/Release/net8.0-windows/win-x64/publish/
