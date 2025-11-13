@@ -10,6 +10,7 @@ A straightforward Windows utility designed to streamline the installation of you
 - **Flexible Configuration:** The app can use a local `apps.yaml` file or fetch the latest version from an online repository.
 - **Portable:** No installation needed for the installer itself. Just run the executable.
 - **Architecture Aware:** Automatically selects the correct installer version (x86 or x64) for your system.
+- **CI/CD Ready:** Includes a GitHub Actions workflow to automatically build and release the application.
 
 ## How It Works
 
@@ -20,10 +21,11 @@ A straightforward Windows utility designed to streamline the installation of you
 
 ## Usage
 
-1.  Ensure the `apps.yaml` file is configured and placed in the same directory as the executable (or that the online repository is accessible).
-2.  Run `HieuckIT-App-Installer.exe`.
-3.  Select the applications you wish to install from the list.
-4.  Click the **Install** button and wait for the process to complete.
+1.  Download the latest release from the [GitHub Actions tab](https://github.com/hieuck/HieuckIT-App-Installer/actions).
+2.  Unzip the `HieuckIT-App-Installer-Release.zip` file.
+3.  Run `HieuckIT-App-Installer.exe`.
+4.  Select the applications you wish to install from the list.
+5.  Click the **Install** button and wait for the process to complete.
 
 ## Configuration (`apps.yaml`)
 
@@ -55,3 +57,12 @@ applications:
 - **IsArchive:** Set to `true` if the downloaded file is a zip/rar archive that needs extraction instead of a standard installer.
 - **PatchArgs:** Command-line arguments for the patching tool (7-Zip) to apply patches.
 - **PatchLinks:** A list of download links for patch files.
+
+---
+
+## Ủng hộ tôi (Support Me)
+
+- **Vietcombank:** `9966595263`
+- **MoMo:** `0966595263`
+- **Chủ tài khoản:** LE TRUNG HIEU
+- **PayPal:** [https://www.paypal.me/hieuck](https://www.paypal.me/hieuck)
