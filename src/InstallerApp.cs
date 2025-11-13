@@ -11,20 +11,26 @@ using Microsoft.Win32;
 using System.Reflection;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using Newtonsoft.Json.Linq;
 
-// Final Version: v4.4 - Admin & Process Kill
+// Final Version: v5.1 - Added Cleanup Option
 public class InstallerForm : Form
 {
     // --- CONFIGURATION ---
+    private const string AppVersion = "5.1.0";
     private const string LocalYamlConfigPath = "apps.yaml";
+    private const string DownloadFolderName = "Downloads";
     private const string OnlineYamlConfigUrl = "https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/src/apps.yaml";
-    private const string SevenZipExeResource = "7z.exe";
-    private const string SevenZipDllResource = "7z.dll";
+    private const string AppUpdateInfoUrl = "https://api.github.com/repos/hieuck/HieuckIT-App-Installer/releases/latest";
+    private readonly string _downloadDirectory;
     // ---------------------
 
     #region UI_Components
     private CheckedListBox appListBox;
     private Button installButton;
+    private Button updateAppsButton;
+    private Button checkForAppUpdateButton;
+    private CheckBox cleanupAfterInstallCheckBox;
     private RichTextBox logTextBox;
     private List<AppInfo> availableApps;
     private readonly bool is64BitOS = Environment.Is64BitOperatingSystem;
@@ -32,8 +38,12 @@ public class InstallerForm : Form
 
     public InstallerForm()
     {
+        _downloadDirectory = Path.Combine(AppContext.BaseDirectory, DownloadFolderName);
+        Directory.CreateDirectory(_downloadDirectory);
         InitializeComponent();
-        Log("Initializing HieuckIT App Installer...", Color.Cyan);
+        Log($"Initializing HieuckIT App Installer...", Color.Cyan);
+        Log($"Application Version: {AppVersion}");
+        Log($"Download folder set to: {_downloadDirectory}");
         Log($"Detected OS: {(is64BitOS ? "64-bit" : "32-bit")}");
         LoadAppConfigAsync();
     }
@@ -41,8 +51,8 @@ public class InstallerForm : Form
     #region UI Initialization
     private void InitializeComponent()
     {
-        this.Text = "HieuckIT App Installer (v4.4 - Admin & Process Kill)";
-        this.Size = new Size(700, 500);
+        this.Text = $"HieuckIT App Installer (v{AppVersion})";
+        this.Size = new Size(800, 500);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedSingle;
         this.MaximizeBox = false;
@@ -60,18 +70,48 @@ public class InstallerForm : Form
         {
             Text = "Loading...",
             Location = new Point(270, 35),
-            Size = new Size(200, 50),
+            Size = new Size(250, 50),
             Font = new Font("Segoe UI", 12, FontStyle.Bold),
             Enabled = false
         };
         installButton.Click += InstallButton_Click;
 
+        updateAppsButton = new Button
+        {
+            Text = "Update App List",
+            Location = new Point(530, 35),
+            Size = new Size(120, 50),
+            Font = new Font("Segoe UI", 9),
+            Enabled = true
+        };
+        updateAppsButton.Click += async (s, e) => await CheckForUpdatesAsync(true);
+
+        checkForAppUpdateButton = new Button
+        {
+            Text = "Check for Updates",
+            Location = new Point(655, 35),
+            Size = new Size(120, 50),
+            Font = new Font("Segoe UI", 9),
+            Enabled = true
+        };
+        checkForAppUpdateButton.Click += CheckForAppUpdate_Click;
+
+
         Label logLabel = new Label() { Text = "Log", Location = new Point(270, 95), Size = new Size(100, 20), Font = new Font("Segoe UI", 9, FontStyle.Bold) };
+
+        cleanupAfterInstallCheckBox = new CheckBox
+        {
+            Text = "Delete downloads after installation",
+            Checked = false, // Default to keeping files
+            Location = new Point(400, 95),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9)
+        };
 
         logTextBox = new RichTextBox
         {
             Location = new Point(270, 120),
-            Size = new Size(400, 330),
+            Size = new Size(505, 330),
             ReadOnly = true,
             BackColor = Color.FromArgb(15, 15, 15),
             ForeColor = Color.FromArgb(0, 255, 0),
@@ -81,7 +121,10 @@ public class InstallerForm : Form
         this.Controls.Add(appLabel);
         this.Controls.Add(appListBox);
         this.Controls.Add(installButton);
+        this.Controls.Add(updateAppsButton);
+        this.Controls.Add(checkForAppUpdateButton);
         this.Controls.Add(logLabel);
+        this.Controls.Add(cleanupAfterInstallCheckBox);
         this.Controls.Add(logTextBox);
     }
     #endregion
@@ -89,67 +132,151 @@ public class InstallerForm : Form
     #region Core Logic
     private async void LoadAppConfigAsync()
     {
-        string configContent = null;
         Log("Attempting to load local YAML configuration...", Color.Cyan);
+        string configContent = null;
 
-        // Try local YAML file first
+        if (File.Exists(LocalYamlConfigPath))
+        {
+            try
+            {
+                configContent = await Task.Run(() => File.ReadAllText(LocalYamlConfigPath));
+                Log("Local YAML configuration loaded successfully.");
+                await CheckForUpdatesAsync(false); // Check for updates in the background
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to read local YAML: {ex.Message}. Will try online.", Color.Yellow);
+            }
+        }
+        
+        if (configContent == null)
+        {
+            Log("No local config found. Downloading from repository...", Color.Cyan);
+            configContent = await DownloadAndUpdateLocalConfig();
+        }
+
+        if (!string.IsNullOrEmpty(configContent))
+        {
+            ParseAndDisplayApps(configContent);
+        }
+        else
+        {
+            Log("FATAL: All configuration sources failed!", Color.Red);
+            MessageBox.Show("Could not load application configuration.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            appListBox.Enabled = false;
+            installButton.Enabled = false;
+            installButton.Text = "Failed!";
+        }
+    }
+    
+    private async Task<string> DownloadAndUpdateLocalConfig()
+    {
         try
         {
-            if (File.Exists(LocalYamlConfigPath))
+            string onlineContent;
+            using (WebClient client = new WebClient { Headers = { ["User-Agent"] = "Mozilla/5.0" } })
             {
-                configContent = File.ReadAllText(LocalYamlConfigPath);
-                Log("Local YAML configuration loaded successfully.");
+                onlineContent = await client.DownloadStringTaskAsync(OnlineYamlConfigUrl);
+            }
+            
+            await Task.Run(() => File.WriteAllText(LocalYamlConfigPath, onlineContent));
+            Log("Downloaded and saved new local configuration.", Color.Green);
+            return onlineContent;
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to download or save new config: {ex.Message}", Color.Red);
+            return null;
+        }
+    }
+
+    private void ParseAndDisplayApps(string yamlContent)
+    {
+        availableApps = ParseYamlConfig(yamlContent);
+        if (availableApps != null && availableApps.Count > 0)
+        {
+            Log($"Loaded {availableApps.Count} applications from YAML.");
+            PopulateAppList();
+            appListBox.Enabled = true;
+            installButton.Enabled = true;
+            installButton.Text = "Install Selected";
+        }
+        else
+        {
+            Log("Failed to parse YAML or no applications found.", Color.Red);
+        }
+    }
+
+    private async Task CheckForUpdatesAsync(bool userInitiated)
+    {
+        Log("Checking for app list updates...", Color.Cyan);
+        try
+        {
+            string localContent = File.Exists(LocalYamlConfigPath) ? await Task.Run(() => File.ReadAllText(LocalYamlConfigPath)) : "";
+            
+            string onlineContent;
+            using (WebClient client = new WebClient { Headers = { ["User-Agent"] = "Mozilla/5.0" } })
+            {
+                onlineContent = await client.DownloadStringTaskAsync(OnlineYamlConfigUrl);
+            }
+
+            if (localContent.Trim() != onlineContent.Trim())
+            {
+                Log("A new version of the application list is available.", Color.Green);
+                var result = MessageBox.Show("A new application list is available. Do you want to update now?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (result == DialogResult.Yes)
+                {
+                    await Task.Run(() => File.WriteAllText(LocalYamlConfigPath, onlineContent));
+                    Log("App list updated. Reloading...", Color.Green);
+                    ParseAndDisplayApps(onlineContent);
+                }
+            }
+            else
+            {
+                Log("App list is up-to-date.");
+                if(userInitiated) MessageBox.Show("Your application list is already up-to-date.", "No Updates", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
         catch (Exception ex)
         {
-             Log($"Failed to read local YAML config: {ex.Message}. Will try online.", Color.Yellow);
+            Log($"Error checking for updates: {ex.Message}", Color.Red);
+            if(userInitiated) MessageBox.Show($"Error checking for updates: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-
-        // If local loading failed, try online YAML
-        if (configContent == null)
+    }
+    
+    private async void CheckForAppUpdate_Click(object sender, EventArgs e)
+    {
+        Log("Checking for program updates...", Color.Cyan);
+        try
         {
-            Log("Attempting to download latest YAML configuration from repository...", Color.Cyan);
-            try
+            using (WebClient client = new WebClient { Headers = { ["User-Agent"] = "HieuckIT-App-Installer" } })
             {
-                using (WebClient client = new WebClient())
+                string json = await client.DownloadStringTaskAsync(AppUpdateInfoUrl);
+                JObject release = JObject.Parse(json);
+                string latestVersionStr = release["tag_name"]?.ToString().TrimStart('v');
+                string releaseUrl = release["html_url"]?.ToString();
+
+                if (new Version(latestVersionStr) > new Version(AppVersion))
                 {
-                    client.Headers.Add("User-Agent", "Mozilla/5.0");
-                    configContent = await client.DownloadStringTaskAsync(OnlineYamlConfigUrl);
-                    Log("Online YAML configuration downloaded successfully.");
+                    Log($"New version available: {latestVersionStr}", Color.Green);
+                    var result = MessageBox.Show($"A new version ({latestVersionStr}) is available. Do you want to go to the download page?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                    if (result == DialogResult.Yes)
+                    {
+                        Process.Start(new ProcessStartInfo(releaseUrl) { UseShellExecute = true });
+                    }
+                }
+                else
+                {
+                    Log("You are on the latest version.");
+                    MessageBox.Show("You are running the latest version.", "Up-to-Date", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
-            catch (Exception ex)
-            {
-                Log($"Online YAML config download failed: {ex.Message}.", Color.Red);
-            }
         }
-
-        // If we have content, parse it
-        if (configContent != null)
+        catch (Exception ex)
         {
-            availableApps = ParseYamlConfig(configContent);
-            if (availableApps != null && availableApps.Count > 0)
-            {
-                Log($"Loaded {availableApps.Count} applications from YAML.");
-                PopulateAppList();
-                appListBox.Enabled = true;
-                installButton.Enabled = true;
-                installButton.Text = "Install Selected";
-                return;
-            }
-            else
-            {
-                Log("Failed to parse YAML or no applications found.", Color.Red);
-            }
+            Log($"Error checking for program update: {ex.Message}", Color.Red);
+            MessageBox.Show($"Error checking for update: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-
-        // If all attempts fail
-        Log("FATAL: All configuration sources failed!", Color.Red);
-        MessageBox.Show("Could not load application configuration.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        appListBox.Enabled = false;
-        installButton.Enabled = false;
-        installButton.Text = "Failed!";
     }
 
     private List<AppInfo> ParseYamlConfig(string yamlContent)
@@ -208,10 +335,8 @@ public class InstallerForm : Form
     {
         Log($"----- Starting process for {appInfo.Name} -----", Color.Yellow);
 
-        // 0. KILL PROCESS
         KillProcess(appInfo.ProcessName);
 
-        // 1. CHOOSE DOWNLOAD LINK
         DownloadLink selectedLink = ChooseLink(appInfo.DownloadLinks);
         if (selectedLink == null) { Log($"Installation for {appInfo.Name} cancelled by user."); return; }
 
@@ -222,7 +347,6 @@ public class InstallerForm : Form
             return;
         }
 
-        // 2. DOWNLOAD
         string downloadedPath = await DownloadFileAsync(appInfo.Name, urlToDownload);
         if (string.IsNullOrEmpty(downloadedPath))
         {
@@ -230,7 +354,6 @@ public class InstallerForm : Form
             return;
         }
 
-        // 3. INSTALL OR EXTRACT
         if (appInfo.IsArchive)
         {
             string installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), appInfo.Name);
@@ -242,19 +365,23 @@ public class InstallerForm : Form
             Log($"{appInfo.Name} installation command executed.");
         }
         
-
-        // 4. PATCH
+        string patchPath = null;
         if (appInfo.PatchLinks != null && appInfo.PatchLinks.Count > 0)
         {
-            await ApplyPatchAsync(appInfo);
+            patchPath = await ApplyPatchAsync(appInfo);
         }
 
-        // 5. CLEANUP
-        CleanupFile(downloadedPath);
+        if (cleanupAfterInstallCheckBox.Checked)
+        {
+            Log("Cleanup enabled, deleting downloaded files...", Color.Gray);
+            CleanupFile(downloadedPath);
+            if(patchPath != null) CleanupFile(patchPath);
+        }
+
         Log($"----- Finished process for {appInfo.Name} -----\n", Color.Yellow);
     }
 
-    private async Task ApplyPatchAsync(AppInfo appInfo)
+    private async Task<string> ApplyPatchAsync(AppInfo appInfo)
     {
         Log($"Patch required for {appInfo.Name}. Locating install directory...");
         string installDir = GetInstallLocation(appInfo.RegistryDisplayName);
@@ -262,22 +389,22 @@ public class InstallerForm : Form
         if (string.IsNullOrEmpty(installDir) || !Directory.Exists(installDir))
         {
              Log($"Could not find install directory for '{appInfo.RegistryDisplayName}'. Skipping patch.", Color.OrangeRed);
-             return;
+             return null;
         }
 
         Log($"Found {appInfo.Name} at: {installDir}");
 
         DownloadLink patchLink = ChooseLink(appInfo.PatchLinks, "Choose Patch Source");
-        if (patchLink == null) { Log("Patching cancelled by user."); return; }
+        if (patchLink == null) { Log("Patching cancelled by user."); return null; }
 
         string patchUrl = is64BitOS ? patchLink.Url_x64 : patchLink.Url_x86;
-        if (string.IsNullOrEmpty(patchUrl)) { Log($"No suitable patch URL for this architecture.", Color.OrangeRed); return; }
+        if (string.IsNullOrEmpty(patchUrl)) { Log($"No suitable patch URL for this architecture.", Color.OrangeRed); return null; }
 
-        string patchPath = await DownloadFileAsync($"{appInfo.Name} Patch", patchUrl);
-        if (string.IsNullOrEmpty(patchPath)) { Log("Patch download failed. Skipping.", Color.Red); return; }
+        string downloadedPatchPath = await DownloadFileAsync($"{appInfo.Name} Patch", patchUrl);
+        if (string.IsNullOrEmpty(downloadedPatchPath)) { Log("Patch download failed. Skipping.", Color.Red); return null; }
 
-        await ExtractArchiveAsync(patchPath, appInfo.PatchArgs, installDir);
-        CleanupFile(patchPath);
+        await ExtractArchiveAsync(downloadedPatchPath, appInfo.PatchArgs, installDir);
+        return downloadedPatchPath; // Return path for potential cleanup
     }
     #endregion
 
@@ -286,7 +413,6 @@ public class InstallerForm : Form
     private void KillProcess(string processName)
     {
         if (string.IsNullOrWhiteSpace(processName)) return;
-
         try
         {
             string plainProcessName = Path.GetFileNameWithoutExtension(processName);
@@ -294,10 +420,7 @@ public class InstallerForm : Form
             if (processes.Length > 0)
             {
                 Log($"Terminating {processes.Length} instance(s) of {processName}...", Color.Orange);
-                foreach (var process in processes)
-                {
-                    process.Kill();
-                }
+                foreach (var process in processes) { process.Kill(); }
                 Log($"{processName} terminated.", Color.Orange);
             }
         }
@@ -312,7 +435,6 @@ public class InstallerForm : Form
         if (links == null || links.Count == 0) return null;
         if (links.Count == 1) return links[0];
 
-        // Create a form on the fly to ask the user
         using (Form choiceForm = new Form())
         {
             DownloadLink result = null;
@@ -344,7 +466,6 @@ public class InstallerForm : Form
             "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
             "SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
         };
-
         foreach (var keyPath in registryKeys)
         {
             using (RegistryKey key = Registry.LocalMachine.OpenSubKey(keyPath))
@@ -373,12 +494,13 @@ public class InstallerForm : Form
         {
             using (WebClient client = new WebClient())
             {
-                string extension = Path.GetExtension(new Uri(url).AbsolutePath);
-                if (string.IsNullOrEmpty(extension) || extension.Length > 5) extension = ".tmp";
-                string filePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}{extension}");
+                var uri = new Uri(url);
+                string fileName = Path.GetFileName(uri.LocalPath);
+                string filePath = Path.Combine(_downloadDirectory, fileName);
 
-                await client.DownloadFileTaskAsync(new Uri(url), filePath);
-                Log($"{appName} downloaded successfully.");
+                Log($"File will be saved to: {filePath}");
+                await client.DownloadFileTaskAsync(uri, filePath);
+                Log($"{appName} downloaded successfully.", Color.Green);
                 return filePath;
             }
         }
@@ -399,7 +521,6 @@ public class InstallerForm : Form
                 Arguments = args,
                 UseShellExecute = true
             };
-
             Log($"Executing: \"{Path.GetFileName(fileName)}\" {args}");
             using (Process process = Process.Start(startInfo))
             {
@@ -415,10 +536,17 @@ public class InstallerForm : Form
 
     private void CleanupFile(string path)
     {
-         if (!string.IsNullOrEmpty(path) && File.Exists(path))
+        if (!string.IsNullOrEmpty(path) && File.Exists(path))
         {
-            try { File.Delete(path); Log($"Cleaned up {Path.GetFileName(path)}."); }
-            catch (Exception ex) { Log($"Failed to cleanup file {path}: {ex.Message}", Color.Yellow); }
+            try
+            {
+                File.Delete(path);
+                Log($"Cleaned up {Path.GetFileName(path)}.", Color.Gray);
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to cleanup file {path}: {ex.Message}", Color.Yellow);
+            }
         }
     }
 
@@ -434,49 +562,16 @@ public class InstallerForm : Form
     #endregion
 
     #region Embedded Resource & 7-Zip Handling
-
-    private bool ExtractEmbeddedResource(string resourceName, string outputPath)
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resourcePath = resourceName;
-        
-        if (Array.Find(assembly.GetManifestResourceNames(), name => name.EndsWith(resourceName)) is string foundName) 
-        { 
-            resourcePath = foundName;
-        }
-
-        using (Stream stream = assembly.GetManifestResourceStream(resourcePath))
-        {
-            if (stream == null) return false;
-            using (FileStream fileStream = new FileStream(outputPath, FileMode.Create))
-            {
-                stream.CopyTo(fileStream);
-            }
-        }
-        return true;
-    }
-
     private async Task<string> Ensure7zExistsAsync()
     {
-        string sevenZipPath = Path.Combine(Path.GetTempPath(), SevenZipExeResource);
-        if (File.Exists(sevenZipPath)) return sevenZipPath;
+        string sevenZipDir = Path.Combine(AppContext.BaseDirectory, is64BitOS ? "7z" : "7z32");
+        string sevenZipExe = Path.Combine(sevenZipDir, "7z.exe");
 
-        Log("7-Zip not found. Extracting from embedded resource...", Color.Cyan);
-        string sevenZipDllPath = Path.Combine(Path.GetTempPath(), SevenZipDllResource);
-
-        bool successExe = await Task.Run(() => ExtractEmbeddedResource(SevenZipExeResource, sevenZipPath));
-        bool successDll = await Task.Run(() => ExtractEmbeddedResource(SevenZipDllResource, sevenZipDllPath));
-
-        if (successExe && successDll)
-        {
-            Log("7-Zip extracted successfully.");
-            return sevenZipPath;
-        }
-        else
-        {
-            Log("FATAL: Could not extract 7-Zip from EXE.", Color.Red);
-            return null;
-        }
+        if (File.Exists(sevenZipExe)) return sevenZipExe;
+        
+        Log($"7-Zip not found at {sevenZipDir}. This is an error in deployment.", Color.Red);
+        MessageBox.Show("7-Zip is missing. Please ensure the 7z/ and 7z32/ folders are alongside the executable.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        return null;
     }
 
      private async Task ExtractArchiveAsync(string archivePath, string argumentPattern, string installDir)
@@ -498,7 +593,7 @@ public class InstallerForm : Form
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = Path.GetTempPath()
+                WorkingDirectory = Path.GetDirectoryName(sevenZipExe)
             };
 
             Log($"Extracting archive with args: {finalArgs}");
