@@ -168,7 +168,7 @@ namespace HieuckIT_App_Installer
 
         private async Task HandleExtractAsync(InstallAction action)
         {
-            string sevenZipExe = await Ensure7zExistsAsync();
+            string sevenZipExe = Ensure7zExists();
             if (sevenZipExe == null || string.IsNullOrEmpty(action.Archive))
             {
                 _logger.Log("7-Zip not found or no archive specified. Skipping extraction.", Color.Red);
@@ -374,7 +374,7 @@ namespace HieuckIT_App_Installer
             return input;
         }
 
-        private async Task<string> Ensure7zExistsAsync()
+        private string Ensure7zExists()
         {
             string sevenZipPath = Path.Combine(AppContext.BaseDirectory, _is64BitOS ? "7z/7z.exe" : "7z32/7z.exe");
             if (File.Exists(sevenZipPath)) return sevenZipPath;
