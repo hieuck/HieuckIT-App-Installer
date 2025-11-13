@@ -13,7 +13,7 @@ namespace HieuckIT_App_Installer
     public class InstallerForm : Form
     {
         // --- Configuration ---
-        private const string AppVersion = "6.0.1-beta"; // Incremented version
+        private const string AppVersion = "6.0.2-beta"; // Incremented version
         private const string BundledConfigName = "apps.yaml";
         private const string DownloadFolderName = "Downloads";
         private const string OnlineYamlConfigUrl = "https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/apps.yaml";
@@ -108,18 +108,21 @@ namespace HieuckIT_App_Installer
 
         private async void LoadInitialAppConfigAsync()
         {
+            // The service now handles all the fallback logic (local, bundled, download)
             _appConfig = await _configService.LoadAppConfigAsync(_userConfigPath, _bundledConfigPath, OnlineYamlConfigUrl);
+
             if (_appConfig != null)
             {
                 PopulateItemTree();
                 EnableControls();
                 // Perform a silent, non-blocking check for app list updates in the background
+                // This runs after the initial load, so it won't block the UI
                 await _configService.DownloadAndUpdateLocalConfig(_userConfigPath, OnlineYamlConfigUrl);
             }
             else
             {
-                _logger.Log("FATAL: Application configuration could not be loaded!", Color.Red);
-                MessageBox.Show("Could not load application configuration.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _logger.Log("FATAL: Application configuration could not be loaded from any source!", Color.Red);
+                MessageBox.Show("Could not load or download application configuration. Please check your internet connection and try again.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 installButton.Text = "Failed!";
             }
         }

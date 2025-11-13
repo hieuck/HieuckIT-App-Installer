@@ -3,7 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
-using HieuckIT_App_Installer.Models; // Missing using directive added
+using HieuckIT_App_Installer.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -41,6 +41,7 @@ namespace HieuckIT_App_Installer.Services
             }
         }
 
+        // Corrected to accept all 3 parameters
         public async Task<YamlRoot> LoadAppConfigAsync(string userConfigPath, string bundledConfigPath, string onlineUrl)
         {
             _logger.Log("Attempting to load YAML configuration...");
@@ -49,7 +50,7 @@ namespace HieuckIT_App_Installer.Services
             // 1. Prioritize user-specific config
             if (File.Exists(userConfigPath))
             {
-                _logger.Log("Local YAML configuration loaded successfully.");
+                _logger.Log("Local YAML configuration loaded from AppData.");
                 configContent = File.ReadAllText(userConfigPath);
             }
             // 2. If not found, use the bundled config and copy it to the user path for future updates
@@ -66,11 +67,8 @@ namespace HieuckIT_App_Installer.Services
                     _logger.Log($"Warning: Could not write initial config to AppData: {ex.Message}", Color.Yellow);
                 }
             }
-            else
-            {
-                _logger.Log("Warning: No local or bundled config file found.", Color.Yellow);
-            }
             
+            // Try to parse whatever local config we found
             if(configContent != null)
             {
                 var config = ParseYamlConfig(configContent);
@@ -81,7 +79,8 @@ namespace HieuckIT_App_Installer.Services
                 }
             }
             
-            _logger.Log("Falling back to downloading from URL as no valid local config was found.");
+            // 3. Fallback to downloading from URL if no valid local config was found or parsed
+            _logger.Log("No valid local config was found or parsed. Falling back to download.");
             string newContent = await DownloadAndUpdateLocalConfig(userConfigPath, onlineUrl);
             return ParseYamlConfig(newContent);
         }
