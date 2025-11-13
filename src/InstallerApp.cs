@@ -167,7 +167,7 @@ namespace HieuckIT_App_Installer
 
             foreach (TreeNode node in checkedNodes)
             {
-                if (node.Tag is Application app)
+                if (node.Tag is HieuckIT_App_Installer.Models.Application app)
                 {
                     await _installService.ProcessApplicationAsync(app, cleanupAfterInstallCheckBox.Checked);
                 }

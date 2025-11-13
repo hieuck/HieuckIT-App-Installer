@@ -56,7 +56,7 @@ namespace HieuckIT_App_Installer
             return null; // Return null if everything fails
         }
 
-        private async Task<string> DownloadAndUpdateLocalConfig(string localPath, string onlineUrl)
+        public async Task<string> DownloadAndUpdateLocalConfig(string localPath, string onlineUrl)
         {
             try
             {
@@ -80,7 +80,7 @@ namespace HieuckIT_App_Installer
         }
 
         // This method now deserializes the YAML into a YamlRoot object
-        private YamlRoot ParseYamlConfig(string yamlContent)
+        public YamlRoot ParseYamlConfig(string yamlContent)
         {
             try
             {
