@@ -10,6 +10,13 @@
     <Authors>hieuck</Authors>
     <ApplicationManifest>src/app.manifest</ApplicationManifest>
     <Description>HieuckIT App Installer - YAML-first Configuration</Description>
+
+    <!-- Self-contained deployment properties -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier> <!-- Target Windows x64 -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+
   </PropertyGroup>
 
   <ItemGroup>
