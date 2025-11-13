@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -6,22 +5,27 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using HieuckIT_App_Installer.Models; // Use the new models namespace
+using HieuckIT_App_Installer.Models;
+using HieuckIT_App_Installer.Services;
 
 namespace HieuckIT_App_Installer
 {
     public class InstallerForm : Form
     {
         // --- Configuration ---
-        private const string AppVersion = "6.0.0-beta"; // Version indicating major refactor
-        private const string LocalYamlConfigPath = "apps.yaml";
+        private const string AppVersion = "6.0.1-beta"; // Incremented version
+        private const string BundledConfigName = "apps.yaml";
         private const string DownloadFolderName = "Downloads";
         private const string OnlineYamlConfigUrl = "https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/apps.yaml";
         private const string AppUpdateInfoUrl = "https://api.github.com/repos/hieuck/HieuckIT-App-Installer/releases/latest";
+
         private readonly string _tempDirectory;
+        private readonly string _appDataPath;
+        private readonly string _userConfigPath;
+        private readonly string _bundledConfigPath;
 
         // --- UI Components ---
-        private TreeView itemTreeView; // Changed from CheckedListBox to TreeView
+        private TreeView itemTreeView;
         private Button installButton;
         private Button updateAppsButton;
         private Button checkForAppUpdateButton;
@@ -29,7 +33,7 @@ namespace HieuckIT_App_Installer
         private RichTextBox logTextBox;
 
         // --- Services & Data ---
-        private YamlRoot _appConfig; // Changed to hold the entire YAML structure
+        private YamlRoot _appConfig;
         private readonly bool _is64BitOS = Environment.Is64BitOperatingSystem;
         private readonly UiLogger _logger;
         private readonly AppConfigService _configService;
@@ -38,7 +42,12 @@ namespace HieuckIT_App_Installer
 
         public InstallerForm()
         {
+            _appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HieuckIT App Installer");
+            _userConfigPath = Path.Combine(_appDataPath, BundledConfigName);
+            _bundledConfigPath = Path.Combine(AppContext.BaseDirectory, BundledConfigName);
             _tempDirectory = Path.Combine(AppContext.BaseDirectory, DownloadFolderName);
+
+            Directory.CreateDirectory(_appDataPath);
             Directory.CreateDirectory(_tempDirectory);
 
             InitializeComponent();
@@ -50,7 +59,7 @@ namespace HieuckIT_App_Installer
 
             _logger.Log($"Initializing HieuckIT App Installer...", Color.Cyan);
             _logger.Log($"Application Version: {AppVersion}");
-            _logger.Log($"Temporary download folder: {_tempDirectory}");
+            _logger.Log($"User config path: {_userConfigPath}");
             _logger.Log($"Detected OS: {(_is64BitOS ? "64-bit" : "32-bit")}");
 
             LoadInitialAppConfigAsync();
@@ -71,7 +80,7 @@ namespace HieuckIT_App_Installer
             {
                 Location = new Point(10, 35),
                 Size = new Size(250, 415),
-                CheckBoxes = true, // Enable checkboxes for selection
+                CheckBoxes = true,
                 Enabled = false,
                 Font = new Font("Segoe UI", 9.5f)
             };
@@ -95,16 +104,17 @@ namespace HieuckIT_App_Installer
         }
         #endregion
 
-        #region Core Logic & Event Handlers
+        #region Core Logic
 
         private async void LoadInitialAppConfigAsync()
         {
-            _appConfig = await _configService.LoadAppConfigAsync(LocalYamlConfigPath, OnlineYamlConfigUrl);
+            _appConfig = await _configService.LoadAppConfigAsync(_userConfigPath, _bundledConfigPath, OnlineYamlConfigUrl);
             if (_appConfig != null)
             {
                 PopulateItemTree();
                 EnableControls();
-                await _updateService.CheckForAppListUpdatesAsync(LocalYamlConfigPath, OnlineYamlConfigUrl); // Background check
+                // Perform a silent, non-blocking check for app list updates in the background
+                await _configService.DownloadAndUpdateLocalConfig(_userConfigPath, OnlineYamlConfigUrl);
             }
             else
             {
@@ -150,6 +160,9 @@ namespace HieuckIT_App_Installer
             installButton.Enabled = true;
             installButton.Text = "Process Selected";
         }
+        #endregion
+
+        #region Event Handlers
 
         private async void InstallButton_Click(object sender, EventArgs e)
         {
@@ -180,14 +193,14 @@ namespace HieuckIT_App_Installer
             _logger.Log("------------------------------------------");
             _logger.Log("All selected tasks have been processed.", Color.Cyan);
             EnableControls();
-        }
-        
+        }        
+
         private List<TreeNode> GetCheckedNodes(TreeNodeCollection nodes)
         {
-            List<TreeNode> checkedNodes = new List<TreeNode>();
-            foreach(TreeNode node in nodes)
+            var checkedNodes = new List<TreeNode>();
+            foreach (TreeNode node in nodes)
             {
-                if(node.Checked && node.Tag != null) { checkedNodes.Add(node); }
+                if (node.Checked && node.Tag != null) { checkedNodes.Add(node); }
                 checkedNodes.AddRange(GetCheckedNodes(node.Nodes));
             }
             return checkedNodes;
@@ -195,12 +208,12 @@ namespace HieuckIT_App_Installer
 
         private async void UpdateAppsButton_Click(object sender, EventArgs e)
         {
-            string newConfigContent = await _configService.DownloadAndUpdateLocalConfig(LocalYamlConfigPath, OnlineYamlConfigUrl);
+            string newConfigContent = await _configService.DownloadAndUpdateLocalConfig(_userConfigPath, OnlineYamlConfigUrl);
             if (!string.IsNullOrEmpty(newConfigContent))
             {
-                // Reparse the new content and repopulate the tree
                 _appConfig = _configService.ParseYamlConfig(newConfigContent);
                 PopulateItemTree();
+                 _logger.Log("App list updated and reloaded successfully.", Color.Green);
             }
         }
 
