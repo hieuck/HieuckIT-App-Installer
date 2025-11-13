@@ -3,6 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using HieuckIT_App_Installer.Models; // Missing using directive added
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
