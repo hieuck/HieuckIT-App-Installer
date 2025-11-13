@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics; 
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -13,16 +14,15 @@ namespace HieuckIT_App_Installer
     public class InstallerForm : Form
     {
         // --- Configuration ---
-        private const string AppVersion = "6.0.2-beta"; // Incremented version
-        private const string BundledConfigName = "apps.yaml";
+        private const string AppVersion = "6.1.0-beta";
+        private const string ConfigName = "apps.yaml";
         private const string DownloadFolderName = "Downloads";
         private const string OnlineYamlConfigUrl = "https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/apps.yaml";
         private const string AppUpdateInfoUrl = "https://api.github.com/repos/hieuck/HieuckIT-App-Installer/releases/latest";
 
-        private readonly string _tempDirectory;
-        private readonly string _appDataPath;
-        private readonly string _userConfigPath;
-        private readonly string _bundledConfigPath;
+        private readonly string _exeDirectory;
+        private readonly string _downloadDirectory;
+        private readonly string _localConfigPath;
 
         // --- UI Components ---
         private TreeView itemTreeView;
@@ -42,24 +42,25 @@ namespace HieuckIT_App_Installer
 
         public InstallerForm()
         {
-            _appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HieuckIT App Installer");
-            _userConfigPath = Path.Combine(_appDataPath, BundledConfigName);
-            _bundledConfigPath = Path.Combine(AppContext.BaseDirectory, BundledConfigName);
-            _tempDirectory = Path.Combine(AppContext.BaseDirectory, DownloadFolderName);
+            _exeDirectory = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+            _downloadDirectory = Path.Combine(_exeDirectory, DownloadFolderName);
+            _localConfigPath = Path.Combine(_exeDirectory, ConfigName);
 
-            Directory.CreateDirectory(_appDataPath);
-            Directory.CreateDirectory(_tempDirectory);
+            // This directory is now created by the build process, but we ensure it exists just in case.
+            Directory.CreateDirectory(_downloadDirectory);
 
             InitializeComponent();
 
             _logger = new UiLogger(logTextBox);
             _configService = new AppConfigService(_logger);
-            _installService = new AppInstallService(_logger, _tempDirectory, _is64BitOS);
+            _installService = new AppInstallService(_logger, _downloadDirectory, _is64BitOS);
             _updateService = new UpdateService(_logger);
 
             _logger.Log($"Initializing HieuckIT App Installer...", Color.Cyan);
             _logger.Log($"Application Version: {AppVersion}");
-            _logger.Log($"User config path: {_userConfigPath}");
+            _logger.Log($"Application Path: {_exeDirectory}", Color.Lime);
+            _logger.Log($"Download Folder: {_downloadDirectory}", Color.Lime);
+            _logger.Log($"Config File: {_localConfigPath}", Color.Lime);
             _logger.Log($"Detected OS: {(_is64BitOS ? "64-bit" : "32-bit")}");
 
             LoadInitialAppConfigAsync();
@@ -108,21 +109,20 @@ namespace HieuckIT_App_Installer
 
         private async void LoadInitialAppConfigAsync()
         {
-            // The service now handles all the fallback logic (local, bundled, download)
-            _appConfig = await _configService.LoadAppConfigAsync(_userConfigPath, _bundledConfigPath, OnlineYamlConfigUrl);
+            _logger.Log("Attempting to load local configuration...", Color.Cyan);
+            
+            _appConfig = await _configService.LoadAppConfigAsync(_localConfigPath, OnlineYamlConfigUrl);
 
             if (_appConfig != null)
             {
                 PopulateItemTree();
                 EnableControls();
-                // Perform a silent, non-blocking check for app list updates in the background
-                // This runs after the initial load, so it won't block the UI
-                await _configService.DownloadAndUpdateLocalConfig(_userConfigPath, OnlineYamlConfigUrl);
+                _logger.Log("Ready to install.", Color.White);
             }
             else
             {
-                _logger.Log("FATAL: Application configuration could not be loaded from any source!", Color.Red);
-                MessageBox.Show("Could not load or download application configuration. Please check your internet connection and try again.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _logger.Log("FATAL: Application configuration could not be loaded!", Color.Red);
+                MessageBox.Show("Could not load application configuration.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 installButton.Text = "Failed!";
             }
         }
@@ -211,7 +211,7 @@ namespace HieuckIT_App_Installer
 
         private async void UpdateAppsButton_Click(object sender, EventArgs e)
         {
-            string newConfigContent = await _configService.DownloadAndUpdateLocalConfig(_userConfigPath, OnlineYamlConfigUrl);
+            string newConfigContent = await _configService.DownloadAndUpdateLocalConfig(_localConfigPath, OnlineYamlConfigUrl);
             if (!string.IsNullOrEmpty(newConfigContent))
             {
                 _appConfig = _configService.ParseYamlConfig(newConfigContent);
