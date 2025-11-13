@@ -20,20 +20,16 @@ jobs:
         dotnet-version: '8.x'
 
     - name: Restore dependencies
-      run: dotnet restore
-      working-directory: scripts
+      run: dotnet restore HieuckIT-App-Installer.csproj
 
     - name: Build
-      run: dotnet build --no-restore
-      working-directory: scripts
+      run: dotnet build HieuckIT-App-Installer.csproj --no-restore
 
     - name: Test
-      run: dotnet test --no-build --verbosity normal
-      working-directory: scripts
+      run: dotnet test HieuckIT-App-Installer.csproj --no-build --verbosity normal
 
     - name: Publish
-      run: dotnet publish -c Release --output ../publish
-      working-directory: scripts
+      run: dotnet publish HieuckIT-App-Installer.csproj -c Release --output ./publish
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
