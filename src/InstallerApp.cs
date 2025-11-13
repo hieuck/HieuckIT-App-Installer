@@ -6,15 +6,18 @@ using System.IO;
 using System.Net;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Web.Script.Serialization;
+using Newtonsoft.Json;
 using Microsoft.Win32;
 using System.Reflection;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
-// Final Version: v4.0 - Ultimate (Architecture-aware, Multi-link)
+// Final Version: v4.1 - YAML-first Edition (Multi-config support)
 public class InstallerForm : Form
 {
     // --- CONFIGURATION ---
-    private const string OnlineConfigUrl = "https://raw.githubusercontent.com/hieuck/curl-uri-wget-download-setup/main/apps.json";
+    private const string OnlineYamlConfigUrl = "https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/src/apps.yaml";
+    private const string OnlineJsonConfigUrl = "https://raw.githubusercontent.com/hieuck/curl-uri-wget-download-setup/main/apps.json";
     private const string FallbackConfigResource = "apps.json";
     private const string SevenZipExeResource = "7z.exe";
     private const string SevenZipDllResource = "7z.dll";
@@ -87,46 +90,99 @@ public class InstallerForm : Form
     #region Core Logic
     private async void LoadAppConfigAsync()
     {
-        string jsonContent = null;
-        Log("Attempting to download latest configuration...", Color.Cyan);
+        string configContent = null;
+        Log("Attempting to download latest YAML configuration...", Color.Cyan);
 
+        // Try YAML first
         try
         {
             using (WebClient client = new WebClient())
             {
                 client.Headers.Add("User-Agent", "Mozilla/5.0");
-                jsonContent = await client.DownloadStringTaskAsync(OnlineConfigUrl);
-                Log("Latest configuration downloaded successfully.");
+                configContent = await client.DownloadStringTaskAsync(OnlineYamlConfigUrl);
+                Log("YAML configuration downloaded successfully.");
+                availableApps = ParseYamlConfig(configContent);
+                if (availableApps != null && availableApps.Count > 0)
+                {
+                    Log($"Loaded {availableApps.Count} applications from YAML.");
+                    PopulateAppList();
+                    appListBox.Enabled = true;
+                    installButton.Enabled = true;
+                    installButton.Text = "Install Selected";
+                    return;
+                }
             }
         }
         catch (Exception ex)
         {
-            Log($"Online config failed: {ex.Message}. Using fallback.", Color.Yellow);
-            jsonContent = ReadEmbeddedResource(FallbackConfigResource);
-             if (jsonContent == null)
+            Log($"YAML config failed: {ex.Message}. Trying JSON...", Color.Yellow);
+        }
+
+        // Fallback to JSON
+        try
+        {
+            using (WebClient client = new WebClient())
             {
-                 Log("FATAL: Fallback configuration is missing!", Color.Red);
-                 MessageBox.Show("Application is corrupted!", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                 return;
+                client.Headers.Add("User-Agent", "Mozilla/5.0");
+                configContent = await client.DownloadStringTaskAsync(OnlineJsonConfigUrl);
+                Log("JSON configuration downloaded successfully.");
+                availableApps = JsonConvert.DeserializeObject<List<AppInfo>>(configContent);
+                Log($"Loaded {availableApps.Count} applications from JSON.");
+                PopulateAppList();
+                appListBox.Enabled = true;
+                installButton.Enabled = true;
+                installButton.Text = "Install Selected";
+                return;
             }
+        }
+        catch (Exception ex)
+        {
+            Log($"Online JSON config failed: {ex.Message}. Using embedded fallback.", Color.Yellow);
+        }
+
+        // Use embedded resource
+        configContent = ReadEmbeddedResource(FallbackConfigResource);
+        if (configContent == null)
+        {
+            Log("FATAL: All configuration sources failed!", Color.Red);
+            MessageBox.Show("Application is corrupted!", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            appListBox.Enabled = false;
+            installButton.Enabled = false;
+            return;
         }
 
         try
         {
-            JavaScriptSerializer serializer = new JavaScriptSerializer();
-            availableApps = serializer.Deserialize<List<AppInfo>>(jsonContent);
-            Log($"Loaded {availableApps.Count} applications.");
+            availableApps = JsonConvert.DeserializeObject<List<AppInfo>>(configContent);
+            Log($"Loaded {availableApps.Count} applications from embedded resource.");
             PopulateAppList();
         }
         catch (Exception ex)
         {
-            Log($"Error parsing configuration: {ex.Message}", Color.Red);
+            Log($"Error parsing embedded configuration: {ex.Message}", Color.Red);
         }
         finally
         {
             appListBox.Enabled = true;
             installButton.Enabled = true;
             installButton.Text = "Install Selected";
+        }
+    }
+
+    private List<AppInfo> ParseYamlConfig(string yamlContent)
+    {
+        try
+        {
+            var deserializer = new DeserializerBuilder()
+                .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                .Build();
+            var root = deserializer.Deserialize<YamlRoot>(yamlContent);
+            return root?.Applications ?? new List<AppInfo>();
+        }
+        catch (Exception ex)
+        {
+            Log($"YAML parsing error: {ex.Message}", Color.Red);
+            return null;
         }
     }
 
@@ -462,18 +518,14 @@ public class InstallerForm : Form
     }
 
     #endregion
-
-    [STAThread]
-    public static void Main()
-    {
-        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
-        Application.Run(new InstallerForm());
-    }
 }
 
 #region Data Models
+public class YamlRoot
+{
+    public List<AppInfo> Applications { get; set; }
+}
+
 public class AppInfo
 {
     public string Name { get; set; }

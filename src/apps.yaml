@@ -1,0 +1,50 @@
+applications:
+  - Name: Google Chrome
+    RegistryDisplayName: Google Chrome
+    InstallerArgs: /silent /install
+    DownloadLinks:
+      - Name: Chrome 64-bit
+        Url_x64: https://dl.google.com/chrome/install/googlechromestandaloneenterprise64.msi
+        Url_x86: https://dl.google.com/chrome/install/googlechromestandaloneenterprise.msi
+    PatchLinks: []
+    PatchArgs: ""
+
+  - Name: Mozilla Firefox
+    RegistryDisplayName: Mozilla Firefox
+    InstallerArgs: /S
+    DownloadLinks:
+      - Name: Firefox 64-bit
+        Url_x64: https://download.mozilla.org/?product=firefox-latest&os=win64&lang=en-US
+        Url_x86: https://download.mozilla.org/?product=firefox-latest&os=win&lang=en-US
+    PatchLinks: []
+    PatchArgs: ""
+
+  - Name: 7-Zip
+    RegistryDisplayName: 7-Zip
+    InstallerArgs: /S
+    DownloadLinks:
+      - Name: 7-Zip 64-bit
+        Url_x64: https://www.7-zip.org/a/7z2301-x64.msi
+        Url_x86: https://www.7-zip.org/a/7z2301.msi
+    PatchLinks: []
+    PatchArgs: ""
+
+  - Name: Notepad++
+    RegistryDisplayName: Notepad++
+    InstallerArgs: /S
+    DownloadLinks:
+      - Name: Notepad++ 64-bit
+        Url_x64: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.6/npp.8.6.Installer.x64.exe
+        Url_x86: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.6/npp.8.6.Installer.exe
+    PatchLinks: []
+    PatchArgs: ""
+
+  - Name: VLC Media Player
+    RegistryDisplayName: VLC media player
+    InstallerArgs: /L=1033 /S
+    DownloadLinks:
+      - Name: VLC 64-bit
+        Url_x64: https://mirror.example.com/videolan/vlc/3.0.20/win64/vlc-3.0.20-win64.msi
+        Url_x86: https://mirror.example.com/videolan/vlc/3.0.20/win32/vlc-3.0.20-win32.msi
+    PatchLinks: []
+    PatchArgs: ""
