@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,19 +7,17 @@ using System.IO;
 using System.Net;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Newtonsoft.Json;
 using Microsoft.Win32;
 using System.Reflection;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-// Final Version: v4.1 - YAML-first Edition (Multi-config support)
+// Final Version: v4.4 - Admin & Process Kill
 public class InstallerForm : Form
 {
     // --- CONFIGURATION ---
+    private const string LocalYamlConfigPath = "apps.yaml";
     private const string OnlineYamlConfigUrl = "https://raw.githubusercontent.com/hieuck/HieuckIT-App-Installer/main/src/apps.yaml";
-    private const string OnlineJsonConfigUrl = "https://raw.githubusercontent.com/hieuck/curl-uri-wget-download-setup/main/apps.json";
-    private const string FallbackConfigResource = "apps.json";
     private const string SevenZipExeResource = "7z.exe";
     private const string SevenZipDllResource = "7z.dll";
     // ---------------------
@@ -42,7 +41,7 @@ public class InstallerForm : Form
     #region UI Initialization
     private void InitializeComponent()
     {
-        this.Text = "HieuckIT App Installer (v4.0 - Ultimate)";
+        this.Text = "HieuckIT App Installer (v4.4 - Admin & Process Kill)";
         this.Size = new Size(700, 500);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -91,82 +90,66 @@ public class InstallerForm : Form
     private async void LoadAppConfigAsync()
     {
         string configContent = null;
-        Log("Attempting to download latest YAML configuration...", Color.Cyan);
+        Log("Attempting to load local YAML configuration...", Color.Cyan);
 
-        // Try YAML first
+        // Try local YAML file first
         try
         {
-            using (WebClient client = new WebClient())
+            if (File.Exists(LocalYamlConfigPath))
             {
-                client.Headers.Add("User-Agent", "Mozilla/5.0");
-                configContent = await client.DownloadStringTaskAsync(OnlineYamlConfigUrl);
-                Log("YAML configuration downloaded successfully.");
-                availableApps = ParseYamlConfig(configContent);
-                if (availableApps != null && availableApps.Count > 0)
-                {
-                    Log($"Loaded {availableApps.Count} applications from YAML.");
-                    PopulateAppList();
-                    appListBox.Enabled = true;
-                    installButton.Enabled = true;
-                    installButton.Text = "Install Selected";
-                    return;
-                }
+                configContent = File.ReadAllText(LocalYamlConfigPath);
+                Log("Local YAML configuration loaded successfully.");
             }
         }
         catch (Exception ex)
         {
-            Log($"YAML config failed: {ex.Message}. Trying JSON...", Color.Yellow);
+             Log($"Failed to read local YAML config: {ex.Message}. Will try online.", Color.Yellow);
         }
 
-        // Fallback to JSON
-        try
+        // If local loading failed, try online YAML
+        if (configContent == null)
         {
-            using (WebClient client = new WebClient())
+            Log("Attempting to download latest YAML configuration from repository...", Color.Cyan);
+            try
             {
-                client.Headers.Add("User-Agent", "Mozilla/5.0");
-                configContent = await client.DownloadStringTaskAsync(OnlineJsonConfigUrl);
-                Log("JSON configuration downloaded successfully.");
-                availableApps = JsonConvert.DeserializeObject<List<AppInfo>>(configContent);
-                Log($"Loaded {availableApps.Count} applications from JSON.");
+                using (WebClient client = new WebClient())
+                {
+                    client.Headers.Add("User-Agent", "Mozilla/5.0");
+                    configContent = await client.DownloadStringTaskAsync(OnlineYamlConfigUrl);
+                    Log("Online YAML configuration downloaded successfully.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Online YAML config download failed: {ex.Message}.", Color.Red);
+            }
+        }
+
+        // If we have content, parse it
+        if (configContent != null)
+        {
+            availableApps = ParseYamlConfig(configContent);
+            if (availableApps != null && availableApps.Count > 0)
+            {
+                Log($"Loaded {availableApps.Count} applications from YAML.");
                 PopulateAppList();
                 appListBox.Enabled = true;
                 installButton.Enabled = true;
                 installButton.Text = "Install Selected";
                 return;
             }
-        }
-        catch (Exception ex)
-        {
-            Log($"Online JSON config failed: {ex.Message}. Using embedded fallback.", Color.Yellow);
-        }
-
-        // Use embedded resource
-        configContent = ReadEmbeddedResource(FallbackConfigResource);
-        if (configContent == null)
-        {
-            Log("FATAL: All configuration sources failed!", Color.Red);
-            MessageBox.Show("Application is corrupted!", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            appListBox.Enabled = false;
-            installButton.Enabled = false;
-            return;
+            else
+            {
+                Log("Failed to parse YAML or no applications found.", Color.Red);
+            }
         }
 
-        try
-        {
-            availableApps = JsonConvert.DeserializeObject<List<AppInfo>>(configContent);
-            Log($"Loaded {availableApps.Count} applications from embedded resource.");
-            PopulateAppList();
-        }
-        catch (Exception ex)
-        {
-            Log($"Error parsing embedded configuration: {ex.Message}", Color.Red);
-        }
-        finally
-        {
-            appListBox.Enabled = true;
-            installButton.Enabled = true;
-            installButton.Text = "Install Selected";
-        }
+        // If all attempts fail
+        Log("FATAL: All configuration sources failed!", Color.Red);
+        MessageBox.Show("Could not load application configuration.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        appListBox.Enabled = false;
+        installButton.Enabled = false;
+        installButton.Text = "Failed!";
     }
 
     private List<AppInfo> ParseYamlConfig(string yamlContent)
@@ -225,6 +208,9 @@ public class InstallerForm : Form
     {
         Log($"----- Starting process for {appInfo.Name} -----", Color.Yellow);
 
+        // 0. KILL PROCESS
+        KillProcess(appInfo.ProcessName);
+
         // 1. CHOOSE DOWNLOAD LINK
         DownloadLink selectedLink = ChooseLink(appInfo.DownloadLinks);
         if (selectedLink == null) { Log($"Installation for {appInfo.Name} cancelled by user."); return; }
@@ -237,16 +223,25 @@ public class InstallerForm : Form
         }
 
         // 2. DOWNLOAD
-        string installerPath = await DownloadFileAsync(appInfo.Name, urlToDownload);
-        if (string.IsNullOrEmpty(installerPath))
+        string downloadedPath = await DownloadFileAsync(appInfo.Name, urlToDownload);
+        if (string.IsNullOrEmpty(downloadedPath))
         {
             Log($"Skipping {appInfo.Name} due to download failure.", Color.Red);
             return;
         }
 
-        // 3. INSTALL
-        await RunProcessAsync(installerPath, appInfo.InstallerArgs);
-        Log($"{appInfo.Name} installation command executed.");
+        // 3. INSTALL OR EXTRACT
+        if (appInfo.IsArchive)
+        {
+            string installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), appInfo.Name);
+            await ExtractArchiveAsync(downloadedPath, $"x -y \"{downloadedPath}\" -o\"{installDir}\"", installDir);
+        }
+        else
+        {
+            await RunProcessAsync(downloadedPath, appInfo.InstallerArgs);
+            Log($"{appInfo.Name} installation command executed.");
+        }
+        
 
         // 4. PATCH
         if (appInfo.PatchLinks != null && appInfo.PatchLinks.Count > 0)
@@ -255,7 +250,7 @@ public class InstallerForm : Form
         }
 
         // 5. CLEANUP
-        CleanupFile(installerPath);
+        CleanupFile(downloadedPath);
         Log($"----- Finished process for {appInfo.Name} -----\n", Color.Yellow);
     }
 
@@ -287,6 +282,30 @@ public class InstallerForm : Form
     #endregion
 
     #region Helper & Utility Methods
+
+    private void KillProcess(string processName)
+    {
+        if (string.IsNullOrWhiteSpace(processName)) return;
+
+        try
+        {
+            string plainProcessName = Path.GetFileNameWithoutExtension(processName);
+            Process[] processes = Process.GetProcessesByName(plainProcessName);
+            if (processes.Length > 0)
+            {
+                Log($"Terminating {processes.Length} instance(s) of {processName}...", Color.Orange);
+                foreach (var process in processes)
+                {
+                    process.Kill();
+                }
+                Log($"{processName} terminated.", Color.Orange);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Error terminating process {processName}: {ex.Message}", Color.Red);
+        }
+    }
 
     private DownloadLink ChooseLink(List<DownloadLink> links, string prompt = "Choose Download Source")
     {
@@ -322,8 +341,8 @@ public class InstallerForm : Form
     private string GetInstallLocation(string displayName)
     {
         string[] registryKeys = {
-            "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-            "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+            "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            "SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
         };
 
         foreach (var keyPath in registryKeys)
@@ -415,26 +434,6 @@ public class InstallerForm : Form
     #endregion
 
     #region Embedded Resource & 7-Zip Handling
-
-    private string ReadEmbeddedResource(string resourceName)
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resourcePath = resourceName;
-
-        if (Array.Find(assembly.GetManifestResourceNames(), name => name.EndsWith(resourceName)) is string foundName) 
-        {
-             resourcePath = foundName;
-        } 
-        
-        using (Stream stream = assembly.GetManifestResourceStream(resourcePath))
-        {
-            if (stream == null) return null;
-            using (StreamReader reader = new StreamReader(stream))
-            {
-                return reader.ReadToEnd();
-            }
-        }
-    }
 
     private bool ExtractEmbeddedResource(string resourceName, string outputPath)
     {
@@ -529,8 +528,10 @@ public class YamlRoot
 public class AppInfo
 {
     public string Name { get; set; }
+    public string ProcessName { get; set; }
     public string RegistryDisplayName { get; set; }
     public string InstallerArgs { get; set; }
+    public bool IsArchive { get; set; }
     public List<DownloadLink> DownloadLinks { get; set; }
     public string PatchArgs { get; set; }
     public List<DownloadLink> PatchLinks { get; set; }
