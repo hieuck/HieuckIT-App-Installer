@@ -41,19 +41,17 @@ namespace HieuckIT_App_Installer.Services
             }
         }
 
-        // Corrected to accept all 3 parameters
+        // DEFINITIVELY set to accept all 3 parameters
         public async Task<YamlRoot> LoadAppConfigAsync(string userConfigPath, string bundledConfigPath, string onlineUrl)
         {
             _logger.Log("Attempting to load YAML configuration...");
             string configContent = null;
 
-            // 1. Prioritize user-specific config
             if (File.Exists(userConfigPath))
             {
                 _logger.Log("Local YAML configuration loaded from AppData.");
                 configContent = File.ReadAllText(userConfigPath);
             }
-            // 2. If not found, use the bundled config and copy it to the user path for future updates
             else if (File.Exists(bundledConfigPath))
             {
                 _logger.Log("No user config found. Using bundled config and copying to AppData.");
@@ -68,7 +66,6 @@ namespace HieuckIT_App_Installer.Services
                 }
             }
             
-            // Try to parse whatever local config we found
             if(configContent != null)
             {
                 var config = ParseYamlConfig(configContent);
@@ -79,8 +76,7 @@ namespace HieuckIT_App_Installer.Services
                 }
             }
             
-            // 3. Fallback to downloading from URL if no valid local config was found or parsed
-            _logger.Log("No valid local config was found or parsed. Falling back to download.");
+            _logger.Log("No valid local config was found. Falling back to downloading from URL.");
             string newContent = await DownloadAndUpdateLocalConfig(userConfigPath, onlineUrl);
             return ParseYamlConfig(newContent);
         }
